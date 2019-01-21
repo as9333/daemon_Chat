@@ -1,0 +1,151 @@
+#!usr/bin/env/ python
+import socket,threading,Queue,os,sys
+from time import sleep
+clients=[]
+buf=Queue.Queue()
+banner="""
+  ____       _     U _____ u  __  __    U  ___ u  _   _    
+ |  _"\  U  /"\  u \| ___"|/U|' \/ '|u   \/"_ \/ | \ |"|   
+/| | | |  \/ _ \/   |  _|"  \| |\/| |/   | | | |<|  \| |>  
+U| |_| |\ / ___ \   | |___   | |  | |.-,_| |_| |U| |\  |u  
+ |____/ u/_/   \_\  |_____|  |_|  |_| \_)-\___/  |_| \_|   
+  |||_    \|    >>  <<   >> <<,-,,-.       \|    ||   |\,-.
+ (__)_)  (__)  (__)(__) (__) (./  \.)     (__)   (_")  (_/ 
+   ____   _   _      _       _____  
+U /"___| |'| |'| U  /"\  u  |_ " _| 
+\| | u  /| |_| |\ \/ _ \/     | |   
+ | |/__ U|  _  |u / ___ \    /| |\  
+  \____| |_| |_| /_/   \_\  u |_|U  
+ _// |\  /|   |\  \|    >>  _// |\_ 
+(__)(__)(_") ("_)(__)  (__)(__) (__)
+-->with love, blackdaemon<--
+"""
+def client_life(client,addr):
+    print "[+]Accepted connection from %s:%d"%(addr[0],addr[1])
+    client.send(banner)
+    client.send("daemon_chat_server:Hi, welcome")
+    username="daemon_chat_server"
+    while username.lower().strip() in ["daemon_chat_server",""]:
+        client.send("\ndaemon_chat_server:Enter username to continue")
+        username=client.recv(1024)
+        if username.lower().strip()=="daemon_chat_server":
+            client.send("daemon_chat_server:reserved username!")
+        elif username.lower().strip()=="":
+            client.send("daemon_chat_server:invalid username!")
+        else:
+            client.send("daemon_chat_server:Accepted username %s. Send '/exit' to close connection"%(username))
+            break
+    buf.put(["daemon_chat_server",username+" joined"])
+    count=0
+    while True:
+        try:
+            msg=client.recv(4096)
+            if msg=="":
+                if count>100:
+                    buf.put(["daemon_chat_server","Connection to "+username+" was lost!"])
+                    clients.remove(tuple([client,addr]))
+                    break
+                count+=1
+                continue
+            else:
+                buf.put([username,msg])
+        except:
+            print "\n[!]An error was encountered while trying to receive.\nclient:"+str(client)+str(addr)
+            break
+        if msg.lower()=="/exit":
+            client.send("daemon_chat_server:Closing connection...")
+            clients.remove(tuple([client,addr]))
+            client.close()
+            break
+server=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+server.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+bind_ip=socket.gethostbyname(raw_input("Host:"))
+bind_port=input("Port:")
+try:
+    server.bind((bind_ip,bind_port))
+    server.listen(5)
+    print "[+]Listening on %s:%d"%(bind_ip,bind_port)
+except:
+    print "[!]Couldn't start server"
+    sys.exit()
+def server_life():
+    print "[+]server awake"
+    while True:
+        client,addr=server.accept()
+        clients.append(tuple([client,addr]))
+        client_thread=threading.Thread(target=client_life,args=(client,addr))
+        client_thread.start()
+def lord():
+    print "[+]lord awake"
+    while True:
+        if len(clients)==0:
+            sleep(30)
+            if len(clients)==0:
+                print "[!]No clients joined...stopping server."
+                server.shutdown(socket.SHUT_RDWR)
+                server.close()
+                os._exit(0)
+def broadcast():
+    print "[+]broadcast awake"
+    while True:
+        while not buf.empty():
+            each_msg=buf.get()
+            for c in clients:
+                try:
+                    c[0].send(each_msg[0]+":"+each_msg[1])
+                except:
+                    print "\n[!]An error was encountered while trying to broadcast.\nclient:"+str(c)
+lord_thread=threading.Thread(target=lord)
+server_thread=threading.Thread(target=server_life)
+broadcast_thread=threading.Thread(target=broadcast)
+banner1="""
+  ____       _     U _____ u  __  __    U  ___ u  _   _    
+ |  _"\  U  /"\  u \| ___"|/U|' \/ '|u   \/"_ \/ | \ |"|   
+/| | | |  \/ _ \/   |  _|"  \| |\/| |/   | | | |<|  \| |>  
+U| |_| |\ / ___ \   | |___   | |  | |.-,_| |_| |U| |\  |u  
+ |____/ u/_/   \_\  |_____|  |_|  |_| \_)-\___/  |_| \_|   
+  |||_    \|    >>  <<   >> <<,-,,-.       \|    ||   |\,-.
+ (__)_)  (__)  (__)(__) (__) (./  \.)     (__)   (_")  (_/ 
+   ____   _   _      _       _____  
+U /"___| |'| |'| U  /"\  u  |_ " _| 
+\| | u  /| |_| |\ \/ _ \/     | |   
+ | |/__ U|  _  |u / ___ \    /| |\  
+  \____| |_| |_| /_/   \_\  u |_|U  
+ _// |\  //   |\  \|    >>  _// |\_ 
+(__)(__)(_") ("_)(__)  (__)(__) (__)
+
+  ____   U _____ u   ____   __     __ U _____ u   ____    
+ / __"| u\| ___"|/U |  _"\ u\ \   /"/u\| ___"|/U |  _"\ u 
+<\___ \/  |  _|"   \| |_) |/ \ \ / //  |  _|"   \| |_) |/ 
+ u___) |  | |___    |  _ <   /\ V /_,-.| |___    |  _ <   
+ |____/>> |_____|   |_| \_\ U  \_/-(_/ |_____|   |_| \_\  
+  )(  (__)<<   >>   //   |\_  //       <<   >>   //   |\_ 
+ (__)    (__) (__) (__)  (__)(__)     (__) (__) (__)  (__)
+-->with love, blackdaemon<--
+"""
+print banner1
+print "Default timeout: 30 seconds"
+broadcast_thread.start()
+server_thread.start()
+lord_thread.start()
+print "Type 'stop' to stop server"
+while True:
+    cmd=raw_input()
+    if cmd.strip().lower()=="stop":
+        print "[+]Stopping server..."
+        server.shutdown(socket.SHUT_RDWR)
+        server.close()
+        os._exit(0)
+    else:
+        print "[!]Type 'stop' to stop server"
+#def dbug():
+#    """debug mode"""
+#    while True:
+#        print "\nINFO-->"
+#        print "clients"
+#        print clients       
+#        print "\nno. of threads: "
+#        print len(threading.enumerate())
+#        sleep(5)
+#dbug_thread=threading.Thread(target=dbug)
+#dbug_thread.start()
